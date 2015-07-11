@@ -6,12 +6,12 @@ module.exports = {
   entry: './es6/main.js',
   output: {
 	path: __dirname,
-	filename: 'bundle.js'
+	filename: './dist/bundle.js'
   },
   module: {
 	loaders: [
-	  { test: path.join(__dirname, 'es6'),
-		loader: 'babel-loader' }
+	  { test: path.join(__dirname, 'es6'), loader: 'babel-loader' },
+	  { test: /\.less$/, loader: "style!css!less" }
 	]
   }
 };
