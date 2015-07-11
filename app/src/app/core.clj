@@ -19,7 +19,7 @@
   (with-channel request channel
     (info channel "connected")
     (swap! clients assoc channel true)
-    (def ball (body! @world { :position [(+ 50 (rand-int 400)) 500] } { :shape (circle 1) :restitution 0.1 }))
+    (def ball (body! @world { :position [(+ 50 (rand-int 400)) 500] } { :shape (circle 1) :restitution 0.8 }))
     (def do-send (every 100 #(send! channel (json/write-str (position ball))) pool))
     (on-close channel (fn [status]
                         (stop do-send)
