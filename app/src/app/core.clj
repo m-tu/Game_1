@@ -9,22 +9,16 @@
             [compojure.route :as route]
             [compojure.core :refer [defroutes GET]]))
 
-(defonce server (atom nil))
-(defonce world (atom nil))
-(defonce clients (atom {}))
 
-(def pool (mk-pool))
+(def poopertron (atom nil))
 
 (defn ws-handler [request]
   (with-channel request channel
     (info channel "connected")
-    (swap! clients assoc channel true)
-    (def ball (body! @world { :position [(+ 50 (rand-int 400)) 500] } { :shape (circle 1) :restitution 0.8 }))
-    (def do-send (every 100 #(send! channel (json/write-str (position ball))) pool))
+    (def clients (:clients poopertron))
+    (swap! poopertron assoc :clients (assoc clients channel {}))
     (on-close channel (fn [status]
-                        (stop do-send)
-                        (destroy! ball)
-                        (swap! clients dissoc channel)
+                        (swap! poopertron assoc :clients (dissoc clients channel))
                         (info "channel closed: " status)))
     (on-receive channel (fn [data]
                           (send! channel data)))))
@@ -37,26 +31,40 @@
 (defn in-dev? [args] true)
 
 (defn stop-server []
-  (when-not (nil? @server)
-    (doseq [conn (keys @clients)]
-      (close conn))
-    (reset! clients {})
-    (@server :timeout 250)
-    (stop-and-reset-pool! pool)
-    (reset! server nil)))
+  (let [state @poopertron]
+    (when-not (nil? state)
+      (stop-and-reset-pool! (:sched-pool state))
+      (doseq [conn (keys (:clients state))]
+        (close conn))
+      ((:server state) :timeout 250)
+      (reset! poopertron nil))))
 
-(defn state-broadcast [channels]
-  (doseq [channel channels]
-    ;(send! channel "broadcast")
-    ()))
+(defn state-broadcast [state]
+  (let [channels (keys (:clients state))
+        bodies (bodyseq (:world state))]
+    (let [dyn-bodies (filter #(= (body-type %) :dynamic) bodies)]
+      (doseq [b dyn-bodies] (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 10))] (center b)))
+      (def positions (json/write-str (map position dyn-bodies)))
+      (doseq [channel channels]
+        (send! channel positions)))))
 
 (defn start-server [& args]
   (let [handler (if (in-dev? args)
                  (reload/wrap-reload (site #'all-routes))
                  (site all-routes))]
     (stop-server)
-    (reset! world (new-world))
-    (body! @world {:type :static} {:shape (edge [-1000 0] [1000 0])})
-    (every 20 #(step! @world (/ 1 100)) pool)
-    (every 500 #(state-broadcast (keys @clients)) pool)
-    (reset! server (run-server handler { :port 9001 }))))
+    (let [server (run-server handler { :port 9001})
+          world (new-world)
+          clients {}]
+      (body! world {:type :static} {:shape (edge [0 -1000] [0 1000])})
+      (body! world {:type :static} {:shape (edge [500 -1000] [500 1000])})
+      (body! world {:type :static} {:shape (edge [-1000 0] [1000 0])})
+      (dotimes [n 3] (body! world {:position [(+ 50 (rand-int 400)) 500]}
+                       {:shape (circle 1) :restitution 0.8 }))
+      (reset! poopertron {:server server
+                          :clients clients
+                          :world world
+                          :sched-pool (mk-pool)})
+      (every 100 #(state-broadcast @poopertron) (:sched-pool @poopertron))
+      (every 20 #(step! (:world @poopertron) (/ 1 20)) (:sched-pool @poopertron)))))
+    

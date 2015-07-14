@@ -19,19 +19,17 @@ manegger.src = 'maneger.jpg';
 
   console.log('start');
   game = new Game();
-  let player_1 = new Player('Marten', 200, 200);
 
-  game.addPlayer(player_1, 0, 0);
-  //game.addPlayer(player_2, 0, 0);
-  //game.getInfo();
-
+  for (var i = 0; i < 3; i++) {
+    game.addPlayer(new Player("nignog" + 1, -100, -100))
+  }
   muthafukingBlackBox();
 
   requestAnimationFrame(update);
 })();
 
 function update() {
-  ctx.clearRect(0, 0, w , h);
+  ctx.clearRect(0, 0, w, h);
   game.players.forEach(p => {
     drawPlayer(p);
   });
@@ -56,10 +54,14 @@ function muthafukingBlackBox() {
   conn.onmessage = (msg) => {
     const content = JSON.parse(msg.data);
     if (!content) return;
-    let [x, y] = content;
-    //console.log('x: %s, y: %s', x, y);
-    game.players[0].x = x;
-    game.players[0].y = y;
+    let positions = content;
+
+    for (var i = 0; i < positions.length; i++) {
+      var p = game.players[i];
+      var [x, y] = positions[i];
+      p.x = x;
+      p.y = h - y - p.h;
+    }
   };
 }
 
