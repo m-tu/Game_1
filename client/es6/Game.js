@@ -16,7 +16,8 @@ class Game {
         prevPosition: [Infinity, Infinity],
         nextPosition: [Infinity, Infinity],
         lastUpdate: 0,
-        snapshotAccumDt: 0
+        snapshotAccumDt: 0,
+        uncappedAccumDt: 0
       };
     }
 
@@ -42,7 +43,10 @@ class Game {
 
     entity.position = [cx, cy];
     entity.snapshotAccumDt += dt;
-    if (entity.snapshotAccumDt > lerpPeriod) entity.snapshotAccumDt = lerpPeriod;
+    entity.uncappedAccumDt += dt;
+    if (entity.snapshotAccumDt > lerpPeriod) {
+      entity.snapshotAccumDt = lerpPeriod;
+    }
     entity.lastUpdate = gameTime;
   }
 
@@ -51,6 +55,7 @@ class Game {
     localEntity.prevPosition = localEntity.nextPosition;
     localEntity.nextPosition = netEntity.position;
     localEntity.snapshotAccumDt = 0;
+    localEntity.uncappedAccumDt = 0;
     localEntity.active = true;
   }
 
