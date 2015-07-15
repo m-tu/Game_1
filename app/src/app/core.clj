@@ -39,16 +39,23 @@
       ((:server state) :timeout 250)
       (reset! poopertron nil))))
 
+(defn dynamic-entities [state]
+  (let [bodies (bodyseq (:world state))]
+    (filter #(= (body-type %) :dynamic) bodies)))
+
+(defn move-entities [state]
+  (let [bodies (dynamic-entities state)]
+    (doseq [b bodies]
+      (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 200))] (center b)))))
+
+
 (defn state-broadcast [state]
   (let [channels (keys (:clients state))
-        bodies (bodyseq (:world state))]
-    (let [dyn-bodies (filter #(= (body-type %) :dynamic) bodies)]
-      (doseq [b dyn-bodies]
-        (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 200))] (center b)))
-      (def entities (json/write-str (map #(-> {:position (position %)
-                                               :id (user-data %)}) dyn-bodies)))
-      (doseq [channel channels]
-        (send! channel entities)))))
+        dyn-bodies (dynamic-entities state)]
+    (def entities (json/write-str (map #(-> {:position (position %)
+                                             :id (user-data %)}) dyn-bodies)))
+    (doseq [channel channels]
+      (send! channel entities))))
 
 (defn start-server [& args]
   (let [handler (if (in-dev? args)
@@ -70,6 +77,7 @@
                           :clients clients
                           :world world
                           :sched-pool (mk-pool)})
+      (every 2000 #(move-entities @poopertron) (:sched-pool @poopertron))
       (every 100 #(state-broadcast @poopertron) (:sched-pool @poopertron))
       (every 20 #(step! (:world @poopertron) (/ 1 20)) (:sched-pool @poopertron)))))
     
