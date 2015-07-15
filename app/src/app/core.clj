@@ -43,10 +43,12 @@
   (let [channels (keys (:clients state))
         bodies (bodyseq (:world state))]
     (let [dyn-bodies (filter #(= (body-type %) :dynamic) bodies)]
-      (doseq [b dyn-bodies] (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 10))] (center b)))
-      (def positions (json/write-str (map position dyn-bodies)))
+      (doseq [b dyn-bodies]
+        (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 200))] (center b)))
+      (def entities (json/write-str (map #(-> {:position (position %)
+                                               :id (user-data %)}) dyn-bodies)))
       (doseq [channel channels]
-        (send! channel positions)))))
+        (send! channel entities)))))
 
 (defn start-server [& args]
   (let [handler (if (in-dev? args)
@@ -54,13 +56,16 @@
                  (site all-routes))]
     (stop-server)
     (let [server (run-server handler { :port 9001})
-          world (new-world)
+          world (new-world [0 0])
           clients {}]
+      ; large ass-boundaries
       (body! world {:type :static} {:shape (edge [0 -1000] [0 1000])})
       (body! world {:type :static} {:shape (edge [500 -1000] [500 1000])})
       (body! world {:type :static} {:shape (edge [-1000 0] [1000 0])})
-      (dotimes [n 3] (body! world {:position [(+ 50 (rand-int 400)) 500]}
-                       {:shape (circle 1) :restitution 0.8 }))
+      (body! world {:type :static} {:shape (edge [-1000 1000] [1000 1000])})
+      (dotimes [n 20]
+        (body! world {:position [(+ 50 (rand-int 400)) 500] :user-data n}
+               {:shape (circle 0.1) :restitution 0.4}))
       (reset! poopertron {:server server
                           :clients clients
                           :world world
