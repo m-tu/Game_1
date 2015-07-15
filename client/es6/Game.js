@@ -1,3 +1,5 @@
+import { lerp, clamp } from './PTMath.js';
+
 class Game {
   constructor() {
     this.players = [];
@@ -10,7 +12,11 @@ class Game {
       this.entities[i] = {
         assetId: 'nigga',
         active: false,
-        position: [Infinity, Infinity]
+        position: [Infinity, Infinity],
+        prevPosition: [Infinity, Infinity],
+        nextPosition: [Infinity, Infinity],
+        lastUpdate: 0,
+        snapshotAccumDt: 0
       };
     }
 
@@ -24,9 +30,27 @@ class Game {
     this.enemies.push(enemy);
   }
 
-  updateEntity(netEntity) {
+  localUpdate(entity, gameTime, lerpPeriod) {
+
+    var [px, py] = entity.prevPosition;
+    var [nx, ny] = entity.nextPosition;
+
+    var dt = gameTime - entity.lastUpdate;
+    var t = entity.snapshotAccumDt / lerpPeriod;
+    var cx = lerp(px, nx, t);
+    var cy = lerp(py, ny, t);
+
+    entity.position = [cx, cy];
+    entity.snapshotAccumDt += dt;
+    if (entity.snapshotAccumDt > lerpPeriod) entity.snapshotAccumDt = lerpPeriod;
+    entity.lastUpdate = gameTime;
+  }
+
+  networkUpdate(netEntity) {
     var localEntity = this.entities[netEntity.id];
-    localEntity.position = netEntity.position;
+    localEntity.prevPosition = localEntity.nextPosition;
+    localEntity.nextPosition = netEntity.position;
+    localEntity.snapshotAccumDt = 0;
     localEntity.active = true;
   }
 

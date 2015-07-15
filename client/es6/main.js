@@ -64,6 +64,7 @@ function update(time) {
 
   var activeEntities = game.activeEntities();
   activeEntities.forEach(e => {
+    game.localUpdate(e, time, 100);
     drawEntity(e);
   });
 
@@ -97,7 +98,7 @@ function muthafukingBlackBox() {
 
     for (var i = 0; i < netEntities.length; i++) {
       var netEntity = netEntities[i];
-      game.updateEntity(netEntity);
+      game.networkUpdate(netEntity);
     }
   };
 }
