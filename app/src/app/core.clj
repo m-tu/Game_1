@@ -44,8 +44,9 @@
     (filter #(= (body-type %) :dynamic) bodies)))
 
 (defn move-entities [state]
-  (let [bodies (dynamic-entities state)]
-    (doseq [b bodies]
+  (let [bodies (dynamic-entities state)
+        n (count bodies)]
+    (doseq [b (repeatedly (rand-int n) #(rand-nth bodies))]
       (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 200))] (center b)))))
 
 
@@ -77,7 +78,7 @@
                           :clients clients
                           :world world
                           :sched-pool (mk-pool)})
-      (every 2000 #(move-entities @poopertron) (:sched-pool @poopertron))
-      (every 100 #(state-broadcast @poopertron) (:sched-pool @poopertron))
+      (every 1000 #(move-entities @poopertron) (:sched-pool @poopertron))
+      (every 250 #(state-broadcast @poopertron) (:sched-pool @poopertron))
       (every 20 #(step! (:world @poopertron) (/ 1 20)) (:sched-pool @poopertron)))))
     

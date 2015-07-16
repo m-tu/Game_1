@@ -7,7 +7,7 @@ var Key = {
   w: 87, a: 65, s: 83, d: 68
 };
 var keys = {};
-const SNAPSHOT_PERIOD = 100;
+const SNAPSHOT_PERIOD = 250;
 
 
 function keyDownListener(evt) {
@@ -90,6 +90,18 @@ function drawSnapshotBar(x, y, entity, snapshotPeriod) {
 
 }
 
+function drawDebugPositions(camera, entity) {
+  ctx.strokeStyle = 'rgb(255, 255, 0)';
+  ctx.lineWidth = 3;
+  const [cx, cy] = camera.position;
+  const [x, y] = entity.prevPosition;
+  const [nx, ny] = entity.nextPosition;
+  ctx.beginPath();
+  ctx.moveTo(x - cx, y - cy);
+  ctx.lineTo(nx - cx, ny - cy);
+  ctx.stroke();
+}
+
 function drawEntity(entity) {
   const imgSize = 75;
   const halfSize = imgSize * 0.5;
@@ -98,12 +110,14 @@ function drawEntity(entity) {
   // Screen coordinates of the entity image
   var [sx, sy] = [x - cx - halfSize, y - cy - halfSize];
 
+  ctx.drawImage(assets[entity.assetId], sx, sy, 75, 75);
   if (debug) {
+    drawDebugPositions(camera, entity);
     ctx.beginPath();
-    ctx.drawImage(assets[entity.assetId], sx, sy, 75, 75);
-    ctx.arc(x - cx, y - cy, 10, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgb(255, 0, 0)';
+    ctx.arc(x - cx, y - cy, 1, 0, 2 * Math.PI);
     ctx.stroke();
-    drawSnapshotBar(x - cx, y - cy, entity, SNAPSHOT_PERIOD);
+    ctx.fill();
   }
 }
 
