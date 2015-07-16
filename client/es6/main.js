@@ -7,7 +7,8 @@ var Key = {
   w: 87, a: 65, s: 83, d: 68
 };
 var keys = {};
-const SNAPSHOT_PERIOD = 250;
+const SNAPSHOT_PERIOD = 100;
+const PPM = 30; //pixels per meter
 
 
 function keyDownListener(evt) {
@@ -23,7 +24,7 @@ window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 window.addEventListener('keydown', keyDownListener, false);
 window.addEventListener('keyup', keyUpListener, false);
 
-var debug = true;
+var debug = false;
 var camera = {
   position: [0, 0],
   speed: 500 // pixels per second
@@ -97,15 +98,16 @@ function drawDebugPositions(camera, entity) {
   const [x, y] = entity.prevPosition;
   const [nx, ny] = entity.nextPosition;
   ctx.beginPath();
-  ctx.moveTo(x - cx, y - cy);
-  ctx.lineTo(nx - cx, ny - cy);
+  ctx.moveTo(x * PPM - cx, y * PPM - cy);
+  ctx.lineTo(nx * PPM - cx, ny * PPM - cy);
   ctx.stroke();
 }
 
 function drawEntity(entity) {
   const imgSize = 75;
   const halfSize = imgSize * 0.5;
-  var [x, y] = entity.position;
+  var [ex, ey] = entity.position;
+  var [x, y] = [ex * PPM, ey * PPM];
   var [cx, cy] = camera.position;
   // Screen coordinates of the entity image
   var [sx, sy] = [x - cx - halfSize, y - cy - halfSize];
@@ -113,11 +115,14 @@ function drawEntity(entity) {
   ctx.drawImage(assets[entity.assetId], sx, sy, 75, 75);
   if (debug) {
     drawDebugPositions(camera, entity);
-    ctx.beginPath();
+    ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgb(255, 0, 0)';
+    ctx.beginPath();
+    ctx.arc(x - cx, y - cy, 1 * PPM, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
     ctx.arc(x - cx, y - cy, 1, 0, 2 * Math.PI);
     ctx.stroke();
-    ctx.fill();
   }
 }
 

@@ -47,7 +47,7 @@
   (let [bodies (dynamic-entities state)
         n (count bodies)]
     (doseq [b (repeatedly (rand-int n) #(rand-nth bodies))]
-      (apply-impulse! b [(+ -25 (rand-int 50)) (+ -100 (rand-int 200))] (center b)))))
+      (apply-impulse! b [(+ -3 (rand-int 7)) (+ -3 (rand-int 7))] (center b)))))
 
 
 (defn state-broadcast [state]
@@ -66,19 +66,18 @@
     (let [server (run-server handler { :port 9001})
           world (new-world [0 0])
           clients {}]
-      ; large ass-boundaries
-      (body! world {:type :static} {:shape (edge [0 -1000] [0 1000])})
-      (body! world {:type :static} {:shape (edge [500 -1000] [500 1000])})
-      (body! world {:type :static} {:shape (edge [-1000 0] [1000 0])})
-      (body! world {:type :static} {:shape (edge [-1000 1000] [1000 1000])})
-      (dotimes [n 20]
-        (body! world {:position [(+ 50 (rand-int 400)) 500] :user-data n}
-               {:shape (circle 0.1) :restitution 0.4}))
+      (body! world {:type :static} {:shape (edge [-25 25] [-25 -25])})
+      (body! world {:type :static} {:shape (edge [-25 -25] [25 -25])})
+      (body! world {:type :static} {:shape (edge [25 -25] [25 25])})
+      (body! world {:type :static} {:shape (edge [25 25] [-25 25])})
+      (dotimes [n 40]
+        (body! world {:position [(+ 5 (rand-int 10)) 10] :user-data n}
+               {:shape (circle 1) :restitution 0.4}))
       (reset! poopertron {:server server
                           :clients clients
                           :world world
                           :sched-pool (mk-pool)})
       (every 1000 #(move-entities @poopertron) (:sched-pool @poopertron))
-      (every 250 #(state-broadcast @poopertron) (:sched-pool @poopertron))
+      (every 100 #(state-broadcast @poopertron) (:sched-pool @poopertron))
       (every 20 #(step! (:world @poopertron) (/ 1 20)) (:sched-pool @poopertron)))))
     
