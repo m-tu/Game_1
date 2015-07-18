@@ -1,5 +1,6 @@
 import Game from './Game.js';
 import Player from './Player.js';
+import * as PTMath from './PTMath.js';
 
 require('../style/style.less');
 
@@ -26,7 +27,7 @@ var ctx, game,//idk
 var mousePos = [0, 0];
 var camera = {
   position: [0, 0],
-  speed: 16, // meters per second
+  speed: 32, // meters per second
   PPM: 30, // pixels per meter
   screenSize: [w, h],
   zoom: 1.0,
@@ -86,15 +87,34 @@ function update(time) {
   var dt = (time - gameTime) / 1000.0;
   gameTime = time;
 
-  const speed = camera.speed * (1.0 / camera.zoom); // So it won't be slow as shit when zoomed out
-  if (keys[Key.w]) camera.position[1] += speed * dt;
-  if (keys[Key.a]) camera.position[0] -= speed * dt;
-  if (keys[Key.s]) camera.position[1] -= speed * dt;
-  if (keys[Key.d]) camera.position[0] += speed * dt;
+  const speed = camera.speed;
 
-  const [cx, cy] = camera.toScreenPosition(camera.position);
+  const pos = camera.position;
+  const [cx, cy] = camera.toScreenPosition(pos);
   const [mx, my] = mousePos;
   const rotation = Math.atan2(cx - mx, cy - my);
+
+  const [dx, dy] = PTMath.normalize([mx - cx, my - cy]); // direction vector
+  const [lx, ly] = [-dy, dx]; // left normal
+  const [rx, ry] = [dy, -dx]; // right normal
+
+  if (keys[Key.w]) {
+    camera.position[0] += speed * dt * dx;
+    camera.position[1] += speed * dt * -dy;
+  }
+  if (keys[Key.a]) {
+    camera.position[0] -= lx * speed * dt; 
+    camera.position[1] += ly * speed * dt; 
+  }
+  if (keys[Key.d]) {
+    camera.position[0] -= rx * speed * dt; 
+    camera.position[1] += ry * speed * dt; 
+  }
+  if (keys[Key.s]) {
+    camera.position[0] -= speed * dt * dx;
+    camera.position[1] -= speed * dt * -dy;
+  }
+
   ctx.clearRect(0, 0, w, h);
 
   var activeEntities = game.activeEntities();
@@ -103,32 +123,16 @@ function update(time) {
     game.localUpdate(e, time, SNAPSHOT_PERIOD);
     drawEntity(e);
   });
+
   const playerImg = assets['player.png'];
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(-rotation);
+  ctx.scale(camera.zoom, camera.zoom);
   ctx.drawImage(playerImg, -playerImg.width * 0.5, -playerImg.height * 0.5);
   ctx.restore();
 
   requestAnimationFrame(update);
-}
-
-function drawSnapshotBar(x, y, entity, snapshotPeriod) {
-  const width = 100;
-  const height = 10;
-  const beginX = x - width * 0.5;
-  const beginY = y - 50;
-
-  if (entity.uncappedAccumDt > snapshotPeriod) {
-    ctx.fillStyle = 'rgb(255, 0, 0)';
-    const overflow = entity.uncappedAccumDt / snapshotPeriod;
-    ctx.fillRect(beginX, beginY, width * overflow, height);
-  }
-  ctx.fillStyle = 'rgb(0, 0, 0)';
-  ctx.fillRect(beginX, beginY, width, height);
-  ctx.fillStyle = 'rgb(0, 255, 0)';
-  ctx.fillRect(beginX, beginY, entity.snapshotAccumDt / snapshotPeriod * width, height);
-
 }
 
 function drawDebugPositions(camera, entity, width) {
