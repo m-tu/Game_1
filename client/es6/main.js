@@ -23,6 +23,7 @@ var ctx, game,//idk
     w = canvas.width,
     h = canvas.height;
 
+var mousePos = [0, 0];
 var camera = {
   position: [0, 0],
   speed: 16, // meters per second
@@ -51,16 +52,24 @@ window.addEventListener('mousewheel', function(evt) {
   camera.zoom *= 1 + zoomFactor;
   return false;
 }, false);
+window.addEventListener('mousemove', function(evt) {
+  const rect = canvas.getBoundingClientRect();
+  mousePos[0] = evt.clientX - rect.left;
+  mousePos[1] = evt.clientY - rect.top;
+}, false);
 
 
 
 var gameTime = 0;
 
-var nignog = new Image();
-nignog.src = 'maneger.png';
-var assets = {
-  nigga: nignog 
-};
+var assets = function(names) {
+  return names.reduce((acc, name) => {
+    var img = new Image();
+    img.src = name;
+    acc[name] = img;
+    return acc;
+  }, {});
+}(['maneger.png', 'player.png']);
 
 (function runGaem(){
   ctx = canvas.getContext('2d');
@@ -83,13 +92,23 @@ function update(time) {
   if (keys[Key.s]) camera.position[1] -= speed * dt;
   if (keys[Key.d]) camera.position[0] += speed * dt;
 
+  const [cx, cy] = camera.toScreenPosition(camera.position);
+  const [mx, my] = mousePos;
+  const rotation = Math.atan2(cx - mx, cy - my);
   ctx.clearRect(0, 0, w, h);
 
   var activeEntities = game.activeEntities();
+  
   activeEntities.forEach(e => {
     game.localUpdate(e, time, SNAPSHOT_PERIOD);
     drawEntity(e);
   });
+  const playerImg = assets['player.png'];
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-rotation);
+  ctx.drawImage(playerImg, -playerImg.width * 0.5, -playerImg.height * 0.5);
+  ctx.restore();
 
   requestAnimationFrame(update);
 }

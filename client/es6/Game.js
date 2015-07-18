@@ -2,15 +2,12 @@ import { lerp, clamp } from './PTMath.js';
 
 class Game {
   constructor() {
-    this.players = [];
-    this.enemies = [];
-
-    var numEntities = 128;
+    var numEntities = 256;
     this.entities = new Array(numEntities);
    
     for (var i = 0; i < numEntities; i++) {
       this.entities[i] = {
-        assetId: 'nigga',
+        assetId: 'maneger.png',
         active: false,
         position: [Infinity, Infinity],
         prevPosition: [Infinity, Infinity],
@@ -21,14 +18,6 @@ class Game {
       };
     }
 
-  }
-
-  addPlayer(player) {
-	  this.players.push(player);
-  }
-
-  addEnemy(enemy) {
-    this.enemies.push(enemy);
   }
 
   localUpdate(entity, gameTime, lerpPeriod) {
