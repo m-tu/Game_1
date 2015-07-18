@@ -94,6 +94,7 @@ var assets = function(names) {
 function update(time) {
   var dt = (time - gameTime) / 1000.0;
   gameTime = time;
+  game.gameTime = gameTime;
 
   const speed = camera.speed;
 
@@ -123,13 +124,19 @@ function update(time) {
 
   ctx.clearRect(0, 0, w, h);
 
-  var activeEntities = game.activeEntities();
-  
-  activeEntities.forEach(e => {
+  game.getEntities('position', 'network').forEach(e => {
     game.localUpdate(e, time, SNAPSHOT_PERIOD);
-    drawEntity(e);
   });
 
+  game.getEntities('position', 'asset').forEach(e => drawEntity(e));
+  
+  if (debug) {
+    game.getEntities('position', 'network').forEach(e => {
+      drawDebugPositions(camera, e); 
+    });
+  }
+
+  // TODO: Components for player control, rotation
   const playerImg = assets['player.png'];
   ctx.save();
   ctx.translate(cx, cy);
@@ -160,14 +167,14 @@ function drawDebugPositions(camera, entity) {
 function drawEntity(entity) {
   const [ex, ey] = entity.position;
   const [sx, sy] = camera.toScreenPosition(entity.position);
-  const scale = camera.zoom;
-  const imgSize = 75 * scale;
-  const halfSize = imgSize * 0.5;
 
-  ctx.drawImage(assets[entity.assetId], sx - halfSize, sy - halfSize, imgSize, imgSize);
-  if (debug) {
-    drawDebugPositions(camera, entity);
-  }
+  const img = assets[entity.assetId];
+  const scale = camera.zoom;
+  const w = img.width * scale;
+  const h = img.height * scale;
+
+  // TODO: Use the save/restore API and use rotation here
+  ctx.drawImage(assets[entity.assetId], sx - w * 0.5, sy - h * 0.5, w, h);
 }
 
 
@@ -175,13 +182,45 @@ function drawEntity(entity) {
 function muthafukingBlackBox() {
   var conn = new WebSocket('ws://localhost:9001/feed');
   conn.onmessage = (msg) => {
-    const netEntities = JSON.parse(msg.data);
-    if (!netEntities) return;
 
-    for (var i = 0; i < netEntities.length; i++) {
-      var netEntity = netEntities[i];
-      game.networkUpdate(netEntity);
+    const message = JSON.parse(msg.data);
+
+    if (!message) return;
+
+    switch (message.type) {
+      case "update":
+        const netEntities = message.content;
+
+        for (var i = 0; i < netEntities.length; i++) {
+          var netEntity = netEntities[i];
+          game.networkUpdate(netEntity);
+        }
+        break;
+      case "spawns":
+        const spawns = message.content;
+        spawns.forEach(spawn => {
+          var entity = game.createEntity(spawn.id);
+          entity.addComponent('position', {
+            position: spawn.position
+          });
+
+          entity.addComponent('network', {
+            prevPosition: spawn.position,
+            nextPosition: spawn.position,
+            lastUpdate: game.gameTime,
+            snapshotAccumDt: 0
+          });
+
+          entity.addComponent('asset', {
+            assetId: 'maneger.png'
+          });
+        });
+        break;
+      default:
+        console.log("received unknown message type: " + message.type);
+        break;
     }
+
   };
 }
 

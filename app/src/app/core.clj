@@ -12,9 +12,17 @@
 
 (def poopertron (atom nil))
 
+(defn dynamic-entities [state]
+  (let [bodies (bodyseq (:world state))]
+    (filter #(= (body-type %) :dynamic) bodies)))
+
+(defn make-spawns [state]
+  (map body-wire-data (dynamic-entities state)))
+
 (defn ws-handler [request]
   (with-channel request channel
     (info channel "connected")
+    (send! channel (make-msg :spawns (make-spawns @poopertron)))
     (def clients (:clients poopertron))
     (swap! poopertron assoc :clients (assoc clients channel {}))
     (on-close channel (fn [status]
@@ -30,6 +38,7 @@
 
 (defn in-dev? [args] true)
 
+
 (defn stop-server []
   (let [state @poopertron]
     (when-not (nil? state)
@@ -39,24 +48,26 @@
       ((:server state) :timeout 250)
       (reset! poopertron nil))))
 
-(defn dynamic-entities [state]
-  (let [bodies (bodyseq (:world state))]
-    (filter #(= (body-type %) :dynamic) bodies)))
 
 (defn move-entities [state]
   (let [bodies (dynamic-entities state)
         n (count bodies)]
     (doseq [b (repeatedly (rand-int n) #(rand-nth bodies))]
-      (apply-impulse! b [(+ -3 (rand-int 7)) (+ -3 (rand-int 7))] (center b)))))
+      (apply-impulse! b [(+ -6 (rand-int 13)) (+ -6 (rand-int 13))] (center b)))))
 
+(defn body-wire-data [body]
+  (-> {:position (position body) :id (user-data body)}))
+
+(defn make-msg [msg-type content]
+  (json/write-str {:type msg-type :content content}))
 
 (defn state-broadcast [state]
   (let [channels (keys (:clients state))
         dyn-bodies (dynamic-entities state)]
-    (def entities (json/write-str (map #(-> {:position (position %)
-                                             :id (user-data %)}) dyn-bodies)))
+    (def entities (map body-wire-data dyn-bodies))
+    (def msg (make-msg :update entities))
     (doseq [channel channels]
-      (send! channel entities))))
+      (send! channel msg))))
 
 (defn start-server [& args]
   (let [handler (if (in-dev? args)
@@ -72,7 +83,7 @@
       (body! world {:type :static} {:shape (edge [25 25] [-25 25])})
       (dotimes [n 40]
         (body! world {:position [(+ 5 (rand-int 10)) 10] :user-data n}
-               {:shape (circle 1) :restitution 0.4}))
+               {:shape (circle 2) :restitution 0.4}))
       (reset! poopertron {:server server
                           :clients clients
                           :world world

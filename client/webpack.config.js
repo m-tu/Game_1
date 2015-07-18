@@ -9,8 +9,10 @@ module.exports = {
 	filename: 'bundle.js'
   },
   module: {
-	loaders: [
-	  { test: path.join(__dirname, 'es6'), loader: 'babel-loader' },
+	loaders: [{
+    test: path.join(__dirname, 'es6'),
+    loader: 'babel-loader?optional=runtime',
+  },
 	  { test: /\.less$/, loader: "style!css!less" }
 	]
   }
