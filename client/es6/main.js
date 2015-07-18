@@ -8,8 +8,6 @@ var Key = {
 };
 var keys = {};
 const SNAPSHOT_PERIOD = 100;
-const PPM = 30; //pixels per meter
-
 
 function keyDownListener(evt) {
   keys[evt.keyCode] = true;
@@ -19,20 +17,42 @@ function keyUpListener(evt) {
   keys[evt.keyCode] = false;
 }
 
-window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
-window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-window.addEventListener('keydown', keyDownListener, false);
-window.addEventListener('keyup', keyUpListener, false);
-
-var debug = false;
-var camera = {
-  position: [0, 0],
-  speed: 500 // pixels per second
-};
+var debug = true;
 var ctx, game,//idk
     canvas = document.getElementById('canvas'),
     w = canvas.width,
     h = canvas.height;
+
+var camera = {
+  position: [0, 0],
+  speed: 16, // meters per second
+  PPM: 30, // pixels per meter
+  screenSize: [w, h],
+  zoom: 1.0,
+
+  toScreenPosition: function(worldPosition) {
+    const PPM = this.PPM;
+    const scale = this.zoom;
+    const [w, h] = this.screenSize;
+    const [x, y] = worldPosition;
+    const [cx, cy] = this.position;
+    return [w * 0.5 - (x - cx) * PPM * -scale, h * 0.5 - (y - cy) * PPM * scale];
+  }
+};
+
+window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+window.addEventListener('keydown', keyDownListener, false);
+window.addEventListener('keyup', keyUpListener, false);
+window.addEventListener('mousewheel', function(evt) {
+  const delta = evt.wheelDeltaY;
+  const dir = delta / Math.abs(delta);
+  const zoomFactor = 0.1 * dir;
+  camera.zoom *= 1 + zoomFactor;
+  return false;
+}, false);
+
+
 
 var gameTime = 0;
 
@@ -57,10 +77,11 @@ function update(time) {
   var dt = (time - gameTime) / 1000.0;
   gameTime = time;
 
-  if (keys[Key.w]) camera.position[1] -= camera.speed * dt;
-  if (keys[Key.a]) camera.position[0] -= camera.speed * dt;
-  if (keys[Key.s]) camera.position[1] += camera.speed * dt;
-  if (keys[Key.d]) camera.position[0] += camera.speed * dt;
+  const speed = camera.speed * (1.0 / camera.zoom); // So it won't be slow as shit when zoomed out
+  if (keys[Key.w]) camera.position[1] += speed * dt;
+  if (keys[Key.a]) camera.position[0] -= speed * dt;
+  if (keys[Key.s]) camera.position[1] -= speed * dt;
+  if (keys[Key.d]) camera.position[0] += speed * dt;
 
   ctx.clearRect(0, 0, w, h);
 
@@ -91,38 +112,32 @@ function drawSnapshotBar(x, y, entity, snapshotPeriod) {
 
 }
 
-function drawDebugPositions(camera, entity) {
+function drawDebugPositions(camera, entity, width) {
   ctx.strokeStyle = 'rgb(255, 255, 0)';
   ctx.lineWidth = 3;
-  const [cx, cy] = camera.position;
-  const [x, y] = entity.prevPosition;
-  const [nx, ny] = entity.nextPosition;
+  const [px, py] = camera.toScreenPosition(entity.prevPosition);
+  const [cx, cy] = camera.toScreenPosition(entity.position);
+  const [nx, ny] = camera.toScreenPosition(entity.nextPosition);
   ctx.beginPath();
-  ctx.moveTo(x * PPM - cx, y * PPM - cy);
-  ctx.lineTo(nx * PPM - cx, ny * PPM - cy);
+  ctx.moveTo(px, py);
+  ctx.lineTo(nx, ny);
   ctx.stroke();
+  ctx.fillStyle = 'rgb(255, 0, 0)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 0.05 * camera.PPM, 0, 2 * Math.PI);
+  ctx.fill();
 }
 
 function drawEntity(entity) {
-  const imgSize = 75;
+  const [ex, ey] = entity.position;
+  const [sx, sy] = camera.toScreenPosition(entity.position);
+  const scale = camera.zoom;
+  const imgSize = 75 * scale;
   const halfSize = imgSize * 0.5;
-  var [ex, ey] = entity.position;
-  var [x, y] = [ex * PPM, ey * PPM];
-  var [cx, cy] = camera.position;
-  // Screen coordinates of the entity image
-  var [sx, sy] = [x - cx - halfSize, y - cy - halfSize];
 
-  ctx.drawImage(assets[entity.assetId], sx, sy, 75, 75);
+  ctx.drawImage(assets[entity.assetId], sx - halfSize, sy - halfSize, imgSize, imgSize);
   if (debug) {
-    drawDebugPositions(camera, entity);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgb(255, 0, 0)';
-    ctx.beginPath();
-    ctx.arc(x - cx, y - cy, 1 * PPM, 0, 2 * Math.PI);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(x - cx, y - cy, 1, 0, 2 * Math.PI);
-    ctx.stroke();
+    drawDebugPositions(camera, entity, halfSize);
   }
 }
 
