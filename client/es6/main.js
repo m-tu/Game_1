@@ -1,6 +1,6 @@
 import Game from './Game.js';
 import Player from './Player.js';
-import * as PTMath from './PTMath.js';
+import * as Vec2 from './Vec2.js';
 
 require('../style/style.less');
 
@@ -33,12 +33,20 @@ var camera = {
   zoom: 1.0,
 
   toScreenPosition: function(worldPosition) {
-    const PPM = this.PPM;
-    const scale = this.zoom;
     const [w, h] = this.screenSize;
     const [x, y] = worldPosition;
     const [cx, cy] = this.position;
-    return [w * 0.5 - (x - cx) * PPM * -scale, h * 0.5 - (y - cy) * PPM * scale];
+    return [w * 0.5 + (x - cx) * this.PPM * this.zoom,
+            h * 0.5 - (y - cy) * this.PPM * this.zoom];
+  },
+
+  toWorldPosition: function(screenPosition) {
+    const scale = this.zoom;
+    const [w, h] = this.screenSize;
+    const [x, y] = screenPosition;
+    const [cx, cy] = this.position;
+    return [(x - w * 0.5) / this.PPM / this.zoom + cx,
+            -(y - h * 0.5) / this.PPM / this.zoom + cy];
   }
 };
 
@@ -89,30 +97,28 @@ function update(time) {
 
   const speed = camera.speed;
 
-  const pos = camera.position;
-  const [cx, cy] = camera.toScreenPosition(pos);
-  const [mx, my] = mousePos;
-  const rotation = Math.atan2(cx - mx, cy - my);
+  const [cx, cy] = camera.toScreenPosition(camera.position);
+  const [mx, my] = camera.toWorldPosition(mousePos);
 
-  const [dx, dy] = PTMath.normalize([mx - cx, my - cy]); // direction vector
+  const diff = [mx - camera.position[0], my - camera.position[1]];
+  const rotation = Math.atan2(diff[0], diff[1]);
+
+  const [dx, dy] = Vec2.normalize(diff); // direction vector
   const [lx, ly] = [-dy, dx]; // left normal
   const [rx, ry] = [dy, -dx]; // right normal
 
+  const st = speed * dt;
   if (keys[Key.w]) {
-    camera.position[0] += speed * dt * dx;
-    camera.position[1] += speed * dt * -dy;
+    camera.position = Vec2.add2(camera.position, [st * dx, st * dy]);
   }
   if (keys[Key.a]) {
-    camera.position[0] -= lx * speed * dt; 
-    camera.position[1] += ly * speed * dt; 
+    camera.position = Vec2.add2(camera.position, [st * lx, st * ly]);
   }
   if (keys[Key.d]) {
-    camera.position[0] -= rx * speed * dt; 
-    camera.position[1] += ry * speed * dt; 
+    camera.position = Vec2.add2(camera.position, [st * rx, st * ry]);
   }
   if (keys[Key.s]) {
-    camera.position[0] -= speed * dt * dx;
-    camera.position[1] -= speed * dt * -dy;
+    camera.position = Vec2.sub2(camera.position, [st * dx, st * dy]);
   }
 
   ctx.clearRect(0, 0, w, h);
@@ -127,7 +133,7 @@ function update(time) {
   const playerImg = assets['player.png'];
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(-rotation);
+  ctx.rotate(rotation);
   ctx.scale(camera.zoom, camera.zoom);
   ctx.drawImage(playerImg, -playerImg.width * 0.5, -playerImg.height * 0.5);
   ctx.restore();
@@ -135,7 +141,7 @@ function update(time) {
   requestAnimationFrame(update);
 }
 
-function drawDebugPositions(camera, entity, width) {
+function drawDebugPositions(camera, entity) {
   ctx.strokeStyle = 'rgb(255, 255, 0)';
   ctx.lineWidth = 3;
   const [px, py] = camera.toScreenPosition(entity.prevPosition);
@@ -160,7 +166,7 @@ function drawEntity(entity) {
 
   ctx.drawImage(assets[entity.assetId], sx - halfSize, sy - halfSize, imgSize, imgSize);
   if (debug) {
-    drawDebugPositions(camera, entity, halfSize);
+    drawDebugPositions(camera, entity);
   }
 }
 
