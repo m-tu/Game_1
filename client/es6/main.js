@@ -167,7 +167,7 @@ function drawEntity(camera, entity) {
 function muthafukingBlackBox() {
 
   // TODO: Separate local and network entity IDs somehow
-  var playerEntity = game.createEntity(100);
+  var playerEntity = game.createEntity();
   playerEntity.addComponent('position', {
     position: [0, 0],
     rotation: 0
@@ -202,18 +202,21 @@ function muthafukingBlackBox() {
       case "spawns":
         const spawns = message.content;
         spawns.forEach(spawn => {
-          var entity = game.createEntity(spawn.id);
+          var entity = game.createEntity();
           entity.addComponent('position', {
             position: spawn.position,
             rotation: 0
           });
 
           entity.addComponent('network', {
+            networkId: spawn.id,
             prevPosition: spawn.position,
             nextPosition: spawn.position,
             lastUpdate: game.gameTime,
             snapshotAccumDt: 0
           });
+
+          game.networkMapping.set(spawn.id, entity.id);
 
           entity.addComponent('asset', {
             assetId: 'maneger.png'

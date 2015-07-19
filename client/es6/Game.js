@@ -26,6 +26,8 @@ class Game {
     this.components = {};
     this.entities = new Array(numEntities);
     this.gameTime = 0;
+    this.idCounter = 0;
+    this.networkMapping = new Map();
   }
 
   localUpdate(entity, gameTime, lerpPeriod) {
@@ -47,12 +49,14 @@ class Game {
   }
 
   networkUpdate(netEntity) {
-    var localEntity = this.entities[netEntity.id];
+    var localId = this.networkMapping.get(netEntity.id);
 
-    if (!localEntity) {
-      console.log("no local entity for net id " + netEntity.id);
+    if (!localId) {
+      console.log("no local id for net id: " + netEntity.id);
       return;
     }
+
+    var localEntity = this.entities[localId];
 
     if (localEntity.hasComponent('position') &&
         localEntity.hasComponent('network')) {
@@ -65,8 +69,9 @@ class Game {
     }
   }
 
-  createEntity(id) {
+  createEntity() {
 
+    const id = this.idCounter++;
     // Could extend here?
     if (id >= this.entities.length) {
       console.log("entity pool not large enough for id " + id);
