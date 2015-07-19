@@ -18,37 +18,30 @@ function keyUpListener(evt) {
   keys[evt.keyCode] = false;
 }
 
-var debug = true;
+var debug = false;
 var ctx, game,//idk
     canvas = document.getElementById('canvas'),
     w = canvas.width,
     h = canvas.height;
 
-var mousePos = [0, 0];
-var camera = {
-  position: [0, 0],
-  speed: 32, // meters per second
-  PPM: 30, // pixels per meter
-  screenSize: [w, h],
-  zoom: 1.0,
 
-  toScreenPosition: function(worldPosition) {
-    const [w, h] = this.screenSize;
-    const [x, y] = worldPosition;
-    const [cx, cy] = this.position;
-    return [w * 0.5 + (x - cx) * this.PPM * this.zoom,
-            h * 0.5 - (y - cy) * this.PPM * this.zoom];
-  },
-
-  toWorldPosition: function(screenPosition) {
-    const scale = this.zoom;
-    const [w, h] = this.screenSize;
-    const [x, y] = screenPosition;
-    const [cx, cy] = this.position;
-    return [(x - w * 0.5) / this.PPM / this.zoom + cx,
-            -(y - h * 0.5) / this.PPM / this.zoom + cy];
-  }
+var toScreenPosition = function(camera, worldPosition) {
+  const [w, h] = camera.screenSize;
+  const [x, y] = worldPosition;
+  const [cx, cy] = camera.position;
+  return [w * 0.5 + (x - cx) * camera.PPM * camera.zoom,
+          h * 0.5 - (y - cy) * camera.PPM * camera.zoom];
 };
+
+var toWorldPosition = function(camera, screenPosition) {
+  const [w, h] = camera.screenSize;
+  const [x, y] = screenPosition;
+  const [cx, cy] = camera.position;
+  return [(x - w * 0.5) / camera.PPM / camera.zoom + cx,
+          -(y - h * 0.5) / camera.PPM / camera.zoom + cy];
+};
+
+var mousePos = [0, 0];
 
 window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
 window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -58,7 +51,9 @@ window.addEventListener('mousewheel', function(evt) {
   const delta = evt.wheelDeltaY;
   const dir = delta / Math.abs(delta);
   const zoomFactor = 0.1 * dir;
-  camera.zoom *= 1 + zoomFactor;
+  game.getEntities('camera').forEach(e => {
+    e.zoom *= 1 + zoomFactor;
+  });
   return false;
 }, false);
 window.addEventListener('mousemove', function(evt) {
@@ -66,10 +61,6 @@ window.addEventListener('mousemove', function(evt) {
   mousePos[0] = evt.clientX - rect.left;
   mousePos[1] = evt.clientY - rect.top;
 }, false);
-
-
-
-var gameTime = 0;
 
 var assets = function(names) {
   return names.reduce((acc, name) => {
@@ -92,43 +83,43 @@ var assets = function(names) {
 })();
 
 function update(time) {
-  var dt = (time - gameTime) / 1000.0;
-  gameTime = time;
-  game.gameTime = gameTime;
 
-  const speed = camera.speed;
+  var dt = (time - game.gameTime) / 1000.0;
+  game.gameTime = time;
 
-  const [cx, cy] = camera.toScreenPosition(camera.position);
-  const [mx, my] = camera.toWorldPosition(mousePos);
+  game.getEntities('position', 'camera').forEach(e => {
+    const speed = e.speed;
+    const st = speed * dt;
+    const [cx, cy] = toScreenPosition(e, e.position);
+    const [mx, my] = toWorldPosition(e, mousePos);
+    const diff = [mx - e.position[0], my - e.position[1]];
+    const rotation = Math.atan2(diff[0], diff[1]);
+    e.rotation = rotation;
 
-  const diff = [mx - camera.position[0], my - camera.position[1]];
-  const rotation = Math.atan2(diff[0], diff[1]);
-
-  const [dx, dy] = Vec2.normalize(diff); // direction vector
-  const [lx, ly] = [-dy, dx]; // left normal
-  const [rx, ry] = [dy, -dx]; // right normal
-
-  const st = speed * dt;
-  if (keys[Key.w]) {
-    camera.position = Vec2.add2(camera.position, [st * dx, st * dy]);
-  }
-  if (keys[Key.a]) {
-    camera.position = Vec2.add2(camera.position, [st * lx, st * ly]);
-  }
-  if (keys[Key.d]) {
-    camera.position = Vec2.add2(camera.position, [st * rx, st * ry]);
-  }
-  if (keys[Key.s]) {
-    camera.position = Vec2.sub2(camera.position, [st * dx, st * dy]);
-  }
-
-  ctx.clearRect(0, 0, w, h);
+    const [dx, dy] = Vec2.normalize(diff); // direction vector
+    const [lx, ly] = [-dy, dx]; // left normal
+    const [rx, ry] = [dy, -dx]; // right normal
+    if (keys[Key.w]) {
+      e.position = Vec2.add2(e.position, [st * dx, st * dy]);
+    }
+    if (keys[Key.a]) {
+      e.position = Vec2.add2(e.position, [st * lx, st * ly]);
+    }
+    if (keys[Key.d]) {
+      e.position = Vec2.add2(e.position, [st * rx, st * ry]);
+    }
+    if (keys[Key.s]) {
+      e.position = Vec2.sub2(e.position, [st * dx, st * dy]);
+    }
+  });
 
   game.getEntities('position', 'network').forEach(e => {
     game.localUpdate(e, time, SNAPSHOT_PERIOD);
   });
 
-  game.getEntities('position', 'asset').forEach(e => drawEntity(e));
+  const camera = game.getEntities('camera', 'position')[0];
+  ctx.clearRect(0, 0, w, h);
+  game.getEntities('position', 'asset').forEach(e => drawEntity(camera, e));
   
   if (debug) {
     game.getEntities('position', 'network').forEach(e => {
@@ -136,24 +127,15 @@ function update(time) {
     });
   }
 
-  // TODO: Components for player control, rotation
-  const playerImg = assets['player.png'];
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(rotation);
-  ctx.scale(camera.zoom, camera.zoom);
-  ctx.drawImage(playerImg, -playerImg.width * 0.5, -playerImg.height * 0.5);
-  ctx.restore();
-
   requestAnimationFrame(update);
 }
 
 function drawDebugPositions(camera, entity) {
   ctx.strokeStyle = 'rgb(255, 255, 0)';
   ctx.lineWidth = 3;
-  const [px, py] = camera.toScreenPosition(entity.prevPosition);
-  const [cx, cy] = camera.toScreenPosition(entity.position);
-  const [nx, ny] = camera.toScreenPosition(entity.nextPosition);
+  const [px, py] = toScreenPosition(camera, entity.prevPosition);
+  const [cx, cy] = toScreenPosition(camera, entity.position);
+  const [nx, ny] = toScreenPosition(camera, entity.nextPosition);
   ctx.beginPath();
   ctx.moveTo(px, py);
   ctx.lineTo(nx, ny);
@@ -164,22 +146,44 @@ function drawDebugPositions(camera, entity) {
   ctx.fill();
 }
 
-function drawEntity(entity) {
-  const [ex, ey] = entity.position;
-  const [sx, sy] = camera.toScreenPosition(entity.position);
+function drawEntity(camera, entity) {
+
+  const [sx, sy] = toScreenPosition(camera, entity.position);
 
   const img = assets[entity.assetId];
-  const scale = camera.zoom;
-  const w = img.width * scale;
-  const h = img.height * scale;
+  const w = img.width;
+  const h = img.height;
 
-  // TODO: Use the save/restore API and use rotation here
-  ctx.drawImage(assets[entity.assetId], sx - w * 0.5, sy - h * 0.5, w, h);
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(entity.rotation);
+  ctx.scale(camera.zoom, camera.zoom);
+  ctx.drawImage(assets[entity.assetId], -w * 0.5, -h * 0.5, w, h);
+  ctx.restore();
 }
 
 
 
 function muthafukingBlackBox() {
+
+  // TODO: Separate local and network entity IDs somehow
+  var playerEntity = game.createEntity(100);
+  playerEntity.addComponent('position', {
+    position: [0, 0],
+    rotation: 0
+  });
+
+  playerEntity.addComponent('camera', {
+    speed: 32, // meters per second
+    PPM: 30, // pixels per meter
+    screenSize: [w, h],
+    zoom: 1.0,
+  });
+
+  playerEntity.addComponent('asset', {
+    assetId: 'player.png'
+  });
+
   var conn = new WebSocket('ws://localhost:9001/feed');
   conn.onmessage = (msg) => {
 
@@ -190,7 +194,6 @@ function muthafukingBlackBox() {
     switch (message.type) {
       case "update":
         const netEntities = message.content;
-
         for (var i = 0; i < netEntities.length; i++) {
           var netEntity = netEntities[i];
           game.networkUpdate(netEntity);
@@ -201,7 +204,8 @@ function muthafukingBlackBox() {
         spawns.forEach(spawn => {
           var entity = game.createEntity(spawn.id);
           entity.addComponent('position', {
-            position: spawn.position
+            position: spawn.position,
+            rotation: 0
           });
 
           entity.addComponent('network', {
