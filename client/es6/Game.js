@@ -28,6 +28,9 @@ class Game {
     this.gameTime = 0;
     this.idCounter = 0;
     this.networkMapping = new Map();
+
+    this.clientUpdateRate = 10;
+    this.currUpdateMs = 0;
   }
 
   localUpdate(entity, gameTime, lerpPeriod) {
@@ -51,7 +54,7 @@ class Game {
   networkUpdate(netEntity) {
     var localId = this.networkMapping.get(netEntity.id);
 
-    if (!localId) {
+    if (localId === undefined) {
       console.log("no local id for net id: " + netEntity.id);
       return;
     }

@@ -87,6 +87,14 @@ function update(time) {
   var dt = (time - game.gameTime) / 1000.0;
   game.gameTime = time;
 
+  game.currUpdateMs += dt;
+  if (game.currUpdateMs >= 1.0 / game.clientUpdateRate) {
+    game.currUpdateMs = 0;
+    if (game.connection.readyState === WebSocket.OPEN) {
+      //game.connection.send("foo");
+    }
+  }
+
   game.getEntities('position', 'camera').forEach(e => {
     const speed = e.speed;
     const st = speed * dt;
@@ -166,7 +174,6 @@ function drawEntity(camera, entity) {
 
 function muthafukingBlackBox() {
 
-  // TODO: Separate local and network entity IDs somehow
   var playerEntity = game.createEntity();
   playerEntity.addComponent('position', {
     position: [0, 0],
@@ -185,6 +192,12 @@ function muthafukingBlackBox() {
   });
 
   var conn = new WebSocket('ws://localhost:9001/feed');
+  game.connection = conn;
+  conn.onopen = (evt) => {
+    conn.send(JSON.stringify({
+      type: 'join-req'
+    }));
+  };
   conn.onmessage = (msg) => {
 
     const message = JSON.parse(msg.data);
@@ -192,14 +205,17 @@ function muthafukingBlackBox() {
     if (!message) return;
 
     switch (message.type) {
-      case "update":
+      case 'join-ack':
+        console.log('received join-ack');
+        break;
+      case 'update':
         const netEntities = message.content;
         for (var i = 0; i < netEntities.length; i++) {
           var netEntity = netEntities[i];
           game.networkUpdate(netEntity);
         }
         break;
-      case "spawns":
+      case 'spawns':
         const spawns = message.content;
         spawns.forEach(spawn => {
           var entity = game.createEntity();
