@@ -91,38 +91,39 @@ function update(time) {
   if (game.currUpdateMs >= 1.0 / game.clientUpdateRate) {
     game.currUpdateMs = 0;
     if (game.connection.readyState === WebSocket.OPEN) {
-      //game.connection.send("foo");
+      game.getEntities('position', 'camera', 'network').forEach(e => {
+
+        var message = {
+          type: 'cl-update',
+          content: {
+            position: e.requestedPosition,
+            rotation: e.rotation,
+            id: e.networkId
+          }
+        };
+        
+        game.connection.send(JSON.stringify(message));
+      });
     }
   }
 
-  game.getEntities('position', 'camera').forEach(e => {
+  game.getEntities('position', 'camera', 'network').forEach(e => {
     const speed = e.speed;
     const st = speed * dt;
-    const [cx, cy] = toScreenPosition(e, e.position);
     const [mx, my] = toWorldPosition(e, mousePos);
     const diff = [mx - e.position[0], my - e.position[1]];
     const rotation = Math.atan2(diff[0], diff[1]);
     e.rotation = rotation;
-
-    const [dx, dy] = Vec2.normalize(diff); // direction vector
-    const [lx, ly] = [-dy, dx]; // left normal
-    const [rx, ry] = [dy, -dx]; // right normal
-    if (keys[Key.w]) {
-      e.position = Vec2.add2(e.position, [st * dx, st * dy]);
-    }
-    if (keys[Key.a]) {
-      e.position = Vec2.add2(e.position, [st * lx, st * ly]);
-    }
-    if (keys[Key.d]) {
-      e.position = Vec2.add2(e.position, [st * rx, st * ry]);
-    }
-    if (keys[Key.s]) {
-      e.position = Vec2.sub2(e.position, [st * dx, st * dy]);
-    }
   });
 
   game.getEntities('position', 'network').forEach(e => {
-    game.localUpdate(e, time, SNAPSHOT_PERIOD);
+
+    // TODO: This can't be undefined here, no way
+    if (e) {
+      game.localUpdate(e, time, SNAPSHOT_PERIOD);
+    } else {
+      console.log("position-network found undefined entity");
+    }
   });
 
   const camera = game.getEntities('camera', 'position')[0];
@@ -203,10 +204,38 @@ function muthafukingBlackBox() {
     const message = JSON.parse(msg.data);
 
     if (!message) return;
-
+    const payload = message.content;
     switch (message.type) {
       case 'join-ack':
-        console.log('received join-ack');
+        playerEntity.addComponent('network', {
+          networkId: payload.id,
+          requestedPosition: payload.position,
+          prevPosition: payload.position,
+          nextPosition: payload.position,
+          lastUpdate: game.gameTime,
+          snapshotAccumDt: 0
+        });
+        game.networkMapping.set(payload.id, playerEntity.id);
+        break;
+      case 'player-join':
+        var entity = game.createEntity();
+        entity.addComponent('position', {
+          position: payload.position
+        });
+
+        entity.addComponent('asset', {
+          assetId: 'player.png'
+        });
+
+        entity.addComponent('network', {
+          networkId: payload.id,
+          prevPosition: payload.position,
+          nextPosition: payload.position,
+          lastUpdate: game.gameTime,
+          snapshotAccumDt: 0
+        });
+
+        game.networkMapping.set(payload.id, entity.id);
         break;
       case 'update':
         const netEntities = message.content;
@@ -215,8 +244,18 @@ function muthafukingBlackBox() {
           game.networkUpdate(netEntity);
         }
         break;
+      case 'player-quit':
+        var localId = game.networkMapping.get(payload.id);
+        var entity = game.findEntity(localId);
+        console.log("destroying entity" + entity);
+        game.destroyEntity(entity);
+        break;
       case 'spawns':
         const spawns = message.content;
+        const assetMap = {
+          'player': 'player.png',
+          'npc': 'maneger.png'
+        };
         spawns.forEach(spawn => {
           var entity = game.createEntity();
           entity.addComponent('position', {
@@ -235,7 +274,7 @@ function muthafukingBlackBox() {
           game.networkMapping.set(spawn.id, entity.id);
 
           entity.addComponent('asset', {
-            assetId: 'maneger.png'
+            assetId: assetMap[spawn.type] || 'maneger.png'
           });
         });
         break;

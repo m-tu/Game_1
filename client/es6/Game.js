@@ -86,12 +86,32 @@ class Game {
     return entity;
   }
 
+  findEntity(id) {
+    return this.entities[id];
+  }
+
+  destroyEntity(entity) {
+    var id = entity.id;
+    for (let c of entity.components) {
+      this.unregisterComponent(c, id);
+    }
+    delete this.entities[id];
+    // TODO: Add ID to free list
+  }
+
   registerComponent(name, id) {
     var ids = this.components[name];
     if (ids) {
       ids.add(id);
     } else {
       this.components[name] = new Set([id]);
+    }
+  }
+
+  unregisterComponent(name, id) {
+    var ids = this.components[name];
+    if (ids) {
+      ids.delete(id);
     }
   }
 
