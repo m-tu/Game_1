@@ -22,4 +22,13 @@ gulp.task("webpack-dev-server", function(callback) {
 	  });
 });
 
+gulp.task("webpack", function(callback) {
+  gutil.log("webpacking");
+  webpack(webpackConfig, function(err, stats) {
+    if (err) throw new gutil.PluginError("webpack", err);
+    gutil.log("[webpack]", stats.toString());
+    callback();
+  });
+});
+
 gulp.task("run", ["webpack-dev-server"]);
