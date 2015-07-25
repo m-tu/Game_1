@@ -69,7 +69,7 @@ var assets = function(names) {
     acc[name] = img;
     return acc;
   }, {});
-}(['maneger.png', 'player.png']);
+}(['maneger.png', 'player.png', 'dummy.png']);
 
 (function runGaem(){
   ctx = canvas.getContext('2d');
@@ -96,7 +96,6 @@ function update(time) {
         var message = {
           type: 'cl-update',
           content: {
-            position: e.requestedPosition,
             rotation: e.rotation,
             id: e.networkId
           }
@@ -112,18 +111,13 @@ function update(time) {
     const st = speed * dt;
     const [mx, my] = toWorldPosition(e, mousePos);
     const diff = [mx - e.position[0], my - e.position[1]];
-    const rotation = Math.atan2(diff[0], diff[1]);
+    var rotation = Math.atan2(diff[0], diff[1]);
+
     e.rotation = rotation;
   });
 
   game.getEntities('position', 'network').forEach(e => {
-
-    // TODO: This can't be undefined here, no way
-    if (e) {
-      game.localUpdate(e, time, SNAPSHOT_PERIOD);
-    } else {
-      console.log("position-network found undefined entity");
-    }
+    game.localUpdate(e, time, SNAPSHOT_PERIOD);
   });
 
   const camera = game.getEntities('camera', 'position')[0];
@@ -208,8 +202,10 @@ function muthafukingBlackBox() {
     switch (message.type) {
       case 'join-ack':
         playerEntity.addComponent('network', {
+          networkWeight: 0,
           networkId: payload.id,
-          requestedPosition: payload.position,
+          prevRotation: payload.rotation || 0,
+          nextRotation: payload.rotation || 0,
           prevPosition: payload.position,
           nextPosition: payload.position,
           lastUpdate: game.gameTime,
@@ -220,7 +216,8 @@ function muthafukingBlackBox() {
       case 'player-join':
         var entity = game.createEntity();
         entity.addComponent('position', {
-          position: payload.position
+          position: payload.position,
+          rotation: 0
         });
 
         entity.addComponent('asset', {
@@ -228,7 +225,10 @@ function muthafukingBlackBox() {
         });
 
         entity.addComponent('network', {
+          networkWeight: 100,
           networkId: payload.id,
+          prevRotation: payload.rotation || 0,
+          nextRotation: payload.rotation || 0,
           prevPosition: payload.position,
           nextPosition: payload.position,
           lastUpdate: game.gameTime,
@@ -264,7 +264,10 @@ function muthafukingBlackBox() {
           });
 
           entity.addComponent('network', {
+            networkWeight: 100,
             networkId: spawn.id,
+            prevRotation: spawn.rotation || 0,
+            nextRotation: spawn.rotation || 0,
             prevPosition: spawn.position,
             nextPosition: spawn.position,
             lastUpdate: game.gameTime,
@@ -274,7 +277,7 @@ function muthafukingBlackBox() {
           game.networkMapping.set(spawn.id, entity.id);
 
           entity.addComponent('asset', {
-            assetId: assetMap[spawn.type] || 'maneger.png'
+            assetId: assetMap[spawn.type] || 'dummy.png'
           });
         });
         break;

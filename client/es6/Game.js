@@ -1,4 +1,16 @@
-import { lerp, clamp } from './PTMath.js';
+import { rlerp, lerp, clamp } from './PTMath.js';
+
+function toPositiveRotation(r) {
+  if (r < 0) return -r;
+
+  return 2 * Math.PI - r;
+}
+
+function toNegativeRotation(r) {
+  if (r < Math.PI) return -r;
+
+  return 2 * Math.PI - r;
+}
 
 class Entity {
 
@@ -29,7 +41,7 @@ class Game {
     this.idCounter = 0;
     this.networkMapping = new Map();
 
-    this.clientUpdateRate = 10;
+    this.clientUpdateRate = 20;
     this.currUpdateMs = 0;
   }
 
@@ -44,6 +56,14 @@ class Game {
     var cy = lerp(py, ny, t);
 
     entity.position = [cx, cy];
+
+    if (entity.networkWeight > 0) {
+      const u = toPositiveRotation(entity.prevRotation);
+      const v = toPositiveRotation(entity.nextRotation);
+      const r = toNegativeRotation(rlerp(u, v, t));
+      entity.rotation = r;
+    }
+
     entity.snapshotAccumDt += dt;
     if (entity.snapshotAccumDt > lerpPeriod) {
       entity.snapshotAccumDt = lerpPeriod;
@@ -63,6 +83,8 @@ class Game {
 
     if (localEntity.hasComponent('position') &&
         localEntity.hasComponent('network')) {
+      localEntity.prevRotation = localEntity.rotation;
+      localEntity.nextRotation = netEntity.rotation;
       localEntity.prevPosition = localEntity.nextPosition;
       localEntity.nextPosition = netEntity.position;
       localEntity.snapshotAccumDt = 0;

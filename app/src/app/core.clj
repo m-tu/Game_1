@@ -35,6 +35,9 @@
   (let [dyn-bodies (dynamic-entities state)]
     (first (filter #(= (:id (user-data %)) id) dyn-bodies))))
 
+(defn is-npc? [body]
+  (= (:type (user-data body)) :npc))
+
 (defn remove-body! [net-id state]
   (let [dyn-bodies (dynamic-entities state)
         matching (filter #(= (:id (user-data %)) net-id) dyn-bodies)]
@@ -47,8 +50,12 @@
 
 (defn serialize-entity [body]
   (let [position (position body)
-        user-data (user-data body)]
+        user-data (user-data body)
+        usr-rot (:rotation user-data)
+        npc-rot (angle body)
+        rotation (first (filter #(not= % nil) [usr-rot npc-rot]))]
   (-> {:position position
+       :rotation rotation
        :id (:id user-data)
        :type (:type user-data)})))
 
@@ -70,8 +77,10 @@
 
 (defn recv-client-update! [cl-state sv-state]
   (let [body (get-body (:id cl-state) sv-state)
+        md (user-data body)
         position (:position cl-state)
         rotation (:rotation cl-state)
+        new-md (assoc md :rotation rotation)
         rot-vec [(Math/sin rotation) (Math/cos rotation)]
         v (linear-velocity body)
         m (mass body)
@@ -80,7 +89,8 @@
         velocity-diff (mapv - velocity-vec v)
         impulse (map #(* % m) velocity-diff)
         center (center body)]
-    (apply-impulse! body impulse center)))
+    (apply-impulse! body impulse center)
+    (set-user-data! body new-md)))
 
 (defn handle-join-req! [channel state]
   (let [world (:world state)
@@ -91,7 +101,7 @@
         remote-channels (remote-clients channel state)]
     (body! world 
            {:position [0 0]
-            :user-data {:id player-id :type :player}}
+            :user-data {:id player-id :type :player :rotation 0}}
            {:shape (circle 2)
             :restitution 0.1})
     (send! channel (make-msg :join-ack {:id player-id :position [0 0]}))
@@ -138,7 +148,7 @@
 
 
 (defn move-entities [state]
-  (let [bodies (dynamic-entities state)
+  (let [bodies (filter is-npc? (dynamic-entities state))
         n (count bodies)]
     (doseq [b (repeatedly (rand-int n) #(rand-nth bodies))]
       (apply-impulse! b [(+ -6 (rand-int 13)) (+ -6 (rand-int 13))] (center b)))))
@@ -163,7 +173,7 @@
       (body! world {:type :static} {:shape (edge [-25 -25] [25 -25])})
       (body! world {:type :static} {:shape (edge [25 -25] [25 25])})
       (body! world {:type :static} {:shape (edge [25 25] [-25 25])})
-      (dotimes [n 40]
+      (dotimes [n 5]
         (body! world {:position [(+ 5 (rand-int 10)) 10] :user-data {:id n :type :npc}}
                {:shape (circle (/ 3 2)) :restitution 0.4}))
       (reset! poopertron {:server server
